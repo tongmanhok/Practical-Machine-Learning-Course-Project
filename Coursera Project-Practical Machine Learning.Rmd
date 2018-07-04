@@ -1,0 +1,108 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Sherwood Tang"
+output:
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r , echo=TRUE}
+library(ggplot2)
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+```
+
+## Loading data
+```{r, echo=TRUE}
+training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+```
+
+
+## PreProcess
+# Feature Selection
+
+First remove near zero variance features, empty columns and NA columns from test and train dataset
+
+```{r, echo=TRUE}
+nzvcol1 <- nearZeroVar(training)
+training <- training[,-nzvcol1]
+training <- training[,-(1:7)]
+training[training == ""] <- NA
+training <- training[, colSums(is.na(training)) == 0]
+
+nzvcol2 <- nearZeroVar(testing)
+testing <- testing[,-nzvcol2]
+testing[testing == ""] <- NA
+testing <- testing[,-(1:7)]
+testing <- testing[, colSums(is.na(testing)) == 0] 
+```
+
+## Train the model
+
+
+1.Partitioning
+```{r , echo=TRUE}
+set.seed(23333)
+intrain <- createDataPartition(training$classe,p=0.7,list=FALSE)
+train <- training[intrain,]
+validation <- training[-intrain,]
+```
+
+2.Random forest
+```{r, echo=TRUE}
+modfit1 <- randomForest(classe~.,data=train,type = "class")
+
+print(modfit1)
+```
+
+3.Rpart
+```{r, echo=TRUE}
+modfit2 <- rpart(classe~.,data=train)
+
+print(modfit2)
+
+rpart.plot(modfit2, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+
+4..Predict the model with validation set
+```{r, echo=TRUE}
+pred1 <- predict(modfit1,validation)
+confusionMatrix(validation$classe, pred1)
+
+pred2 <- predict(modfit2,validation,type="class")
+confusionMatrix(validation$classe, pred2)
+```
+
+We have reached a 99.7% of accuracy by using random forest. The accuracy rate of random forest is 
+higher than rpart. Therefore we choose random forest to make the prediction on test dataset.
+
+## Apply to the test dataset
+
+```{r, echo=TRUE}
+finalpred <- predict(modfit1,testing,type="class")
+finalpred
+```
+
+Save the output
+```{r, echo=TRUE}
+answers <- as.vector(finalpred)
+
+pml_write_files = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, 
+            col.names = FALSE)
+    }
+}
+
+pml_write_files(answers)
+```
